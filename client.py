@@ -12,6 +12,10 @@ def start(addr):
     # Connect to server
     clientSocket.connect(addr)
 
-    clientSocket.send('hello'.encode())
-
+    clientSocket.send('login'.encode())
+    while True:
+        data = clientSocket.recv(1024).decode()
+        userdata = input(data)
+        clientSocket.send(userdata.encode())
+        
 main()
