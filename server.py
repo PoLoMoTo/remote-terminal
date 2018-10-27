@@ -1,4 +1,6 @@
-from socket import *
+from multiprocessing import Process
+from socket import socket, AF_INET, SOCK_STREAM
+import signal
 
 logins = {
     'test': 'cab123'
@@ -14,15 +16,28 @@ def start(addr):
     welcomeSocket = socket(AF_INET, SOCK_STREAM)
     welcomeSocket.bind(addr)
     welcomeSocket.listen(5)
+    processes = []
 
-    # Take connections and direct to servlet
-    while True:
-        connection, addr = welcomeSocket.accept()
-        servlet(connection)
+    # Stop accepting connections and wait for all connections to close
+    # on interrupt
+    try:
+        # Take connections and direct to servlet
+        while True:
+            connection, addr = welcomeSocket.accept()
+            P = Process(target=servlet, args=(connection,))
+            P.start()
+            processes.append(P)
+    except KeyboardInterrupt:
+        while processes:
+            processes.pop().join()
+        welcomeSocket.close()
 
 # Servlet to handle connections
 # This will help support threading later
 def servlet(connection):
+    # Redirect keyboard interupt signal for children
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     user = ''
 
     # Prompt for client login
@@ -53,11 +68,12 @@ def servlet(connection):
         connection.close()
         return
 
+    # Accept user data until exit
     data = connection.recv(1024).decode()
     while data and data != 'exit':
         print(data)
         connection.send('success'.encode())
-        data = connection.recv(1024)
+        data = connection.recv(1024).decode()
     connection.close()
 
 main()
