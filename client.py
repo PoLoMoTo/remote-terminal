@@ -27,9 +27,9 @@ def start(addr):
 
         # Act on server response
         if data == 'username':
-            userdata = input('Username: ')
+            userdata = 'username.' + input('Username: ')
         elif data == 'password':
-            userdata = input('Password: ')
+            userdata = 'password.' + input('Password: ')
         elif data[:6] == 'error.':
             print('Received error: ' + data[6:])
             break

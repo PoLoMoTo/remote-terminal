@@ -45,37 +45,11 @@ def servlet(connection):
     # Redirect keyboard interupt signal for children
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+    # Credential data
     user = ''
     authenticated = False
 
-    # Prompt for client login
-    data = connection.recv(1024).decode()
-    if data == 'login':
-        connection.send('username'.encode())
-    else:
-        connection.send('error.auth'.encode())
-        connection.close()
-        return
-
-    # Check valid user, prompt password
-    data = connection.recv(1024).decode()
-    if data.isalpha() and data in logins:
-        user = data
-        connection.send('password'.encode())
-    else:
-        connection.send('error.auth'.encode())
-        connection.close()
-        return
-
-    # Validate user, break otherwise
-    data = connection.recv(1024).decode()
-    if data.isalnum() and  data == logins[user]:
-        connection.send('success'.encode())
-    else:
-        connection.send('error.auth'.encode())
-        connection.close()
-        return
-
+    # Client interaction loop
     while True:
         # Receive user data
         data = connection.recv(1024).decode()
@@ -88,9 +62,40 @@ def servlet(connection):
                 furtherData = connection.recv(1024, MSG_DONTWAIT).decode()
                 data += furtherData
 
+        # Exit if connection closes
         if not data:
             break
-        else:
+
+        # Block access until authenticated
+        elif not authenticated:
+            # Validate username and prompt for password
+            if data[:9] == 'username.':
+                if data[9:].isalpha() and data[9:] in logins:
+                    user = data[9:]
+                    connection.send('password'.encode())
+                else:
+                    connection.send('error.auth'.encode())
+                    break
+
+            # Validate password
+            elif data[:9] == 'password.':
+                if data[9:].isalnum() and data[9:] == logins[user]:
+                    authenticated = True
+                    connection.send('success'.encode())
+                else:
+                    connection.send('error.auth'.encode())
+                    break
+
+            # No username, prompt for username
+            elif not user:
+                connection.send('username'.encode())
+
+            # Username but not authenticated, prompt for password
+            else:
+                connection.send('password'.encode())
+
+        # Allow authenticated user to access services
+        elif authenticated:
             print('> ' + data)
             connection.send('success'.encode())
 
