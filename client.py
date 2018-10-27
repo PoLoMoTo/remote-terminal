@@ -1,10 +1,13 @@
-from socket import *
-import signal
+from socket import socket, AF_INET, SOCK_STREAM
+import sys
 
-def main():
-    host = 'localhost'
-    port = 2222
-    start((host, port))
+def main(argv):
+    if argv[0].isalpha() and argv[1].isnumeric():
+        host = argv[0]
+        port = int(argv[1])
+        start((host, port))
+    else:
+        print('Invalid arguments!')
 
 def start(addr):
     # Create client socket
@@ -13,17 +16,38 @@ def start(addr):
     # Connect to server
     clientSocket.connect(addr)
 
-    # Prompt server for login
+    # Prompt server for login (Required to start connection)
     clientSocket.send('login'.encode())
 
-    # User input, exit on exit received
-    userdata = ''
-    while userdata != 'exit':
+    # Running connection loop
+    while True:
+
+        # Wait for data from the server
         data = clientSocket.recv(1024).decode()
-        userdata = input(data)
+
+        # Act on server response
+        if data == 'username':
+            userdata = input('Username: ')
+        elif data == 'password':
+            userdata = input('Password: ')
+        elif data[:6] == 'error.':
+            print('Received error: ' + data[6:])
+            break
+        elif data == 'success':
+            userdata = input('> ')
+        else:
+            print('Unknown response: ' + data)
+            break
+
+        # If the user requested exit break the loop
+        if userdata == 'exit':
+            break
+
+        # Send the client data to the server
         clientSocket.send(userdata.encode())
 
     # Close socket
     clientSocket.close()
 
-main()
+if __name__ == "__main__":
+    main(sys.argv[1:])

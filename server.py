@@ -1,15 +1,18 @@
 from multiprocessing import Process
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, SHUT_RD, MSG_DONTWAIT
 import signal
+import sys
 
 logins = {
     'test': 'cab123'
 }
 
-def main():
-    host = ''
-    port = 2222
-    start((host, port))
+def main(argv):
+    if argv[0].isnumeric():
+        port = int(argv[0])
+        start(('', port))
+    else:
+        print('Invalid arguments!')
 
 def start(addr):
     # Open server socket
@@ -28,8 +31,12 @@ def start(addr):
             P.start()
             processes.append(P)
     except KeyboardInterrupt:
+        # Refuse further connection requests
+        welcomeSocket.shutdown(SHUT_RD)
+        # Wait for existing connections to disconnect
         while processes:
             processes.pop().join()
+        # Close the socket
         welcomeSocket.close()
 
 # Servlet to handle connections
@@ -39,6 +46,7 @@ def servlet(connection):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     user = ''
+    authenticated = False
 
     # Prompt for client login
     data = connection.recv(1024).decode()
@@ -68,12 +76,25 @@ def servlet(connection):
         connection.close()
         return
 
-    # Accept user data until exit
-    data = connection.recv(1024).decode()
-    while data and data != 'exit':
-        print(data)
-        connection.send('success'.encode())
+    while True:
+        # Receive user data
         data = connection.recv(1024).decode()
+
+        # Receive until the buffer is empty
+        if data and len(data) == 1024:
+            furtherData = connection.recv(1024, MSG_DONTWAIT).decode()
+            data += furtherData
+            while furtherData and len(furtherData) == 1024:
+                furtherData = connection.recv(1024, MSG_DONTWAIT).decode()
+                data += furtherData
+
+        if not data:
+            break
+        else:
+            print('> ' + data)
+            connection.send('success'.encode())
+
     connection.close()
 
-main()
+if __name__ == "__main__":
+    main(sys.argv[1:])
